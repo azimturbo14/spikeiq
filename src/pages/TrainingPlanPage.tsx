@@ -21,6 +21,7 @@ export function TrainingPlanPage() {
           title="No training plan yet"
           description="SpikeIQ will not create a fake plan from an unanalyzed clip. Upload videos, then use the local heuristic estimates to guide training focus."
           actionLabel="Upload session"
+          actionTo="/analyze?mode=quick"
         />
         <Card className="mt-6 overflow-hidden">
           <CardHeader>
