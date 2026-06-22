@@ -34,12 +34,16 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
     const frames: FrameSample[] = []
 
     for (let index = 0; index < frameCount; index += 1) {
-      const time = frameCount <= 1 ? 0 : (index / (frameCount - 1)) * duration
+      const time = (index / Math.max(frameCount - 1, 1)) * duration
       try {
-        await seekVideo(video, time)
+        video.currentTime = time
+        // Wait a bit for the video to seek
+        await new Promise(r => setTimeout(r, 50))
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-        frames.push({ data: imageData.data })
+        if (imageData.data.length > 0) {
+          frames.push({ data: imageData.data })
+        }
       } catch (error) {
         console.error('Frame capture failed at index', index, error)
         throw error
@@ -85,8 +89,6 @@ async function seekVideo(video: HTMLVideoElement, time: number) {
 
 function analyseFrames(frames: FrameSample[]) {
   const diffs: { diff: number; movingRatio: number; centroidX: number; centroidY: number }[] = []
-
-  for (let index = 1; index < frames.length; index += 1) {
 
   for (let index = 1; index < frames.length; index += 1) {
     const previous = frames[index - 1].data

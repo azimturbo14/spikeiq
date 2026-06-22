@@ -77,7 +77,10 @@ export async function updateStaminaAttempt(sessionId: string, attemptIndex: numb
 
 export async function updateSessionStatus(sessionId: string, status: Session['status'], analysisError?: string, analysis?: SpikeAnalysis | null) {
   const session = await db.sessions.get(sessionId)
-  if (!session) return
+  if (!session) {
+    console.warn('updateSessionStatus: session not found', sessionId)
+    return
+  }
 
   await db.sessions.update(sessionId, {
     status,
@@ -85,6 +88,9 @@ export async function updateSessionStatus(sessionId: string, status: Session['st
     analysis,
     updatedAt: new Date().toISOString(),
   })
+  if (analysis) {
+    console.log('updateSessionStatus: analysis saved', { sessionId, spikeCount: analysis.spikeCount })
+  }
 }
 
 export async function updateSessionVideo(sessionId: string, videoId: string, fileName: string) {
