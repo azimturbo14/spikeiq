@@ -63,7 +63,7 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
   }
 }
 
-async function seekVideo(video: HTMLVideoElement, time: number) {
+function analyseFrames(frames: FrameSample[]) {
   return new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Video seek timed out.')), 5000)
     const onSeeked = () => {
