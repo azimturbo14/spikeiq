@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { createSession, updateSessionStatus, updateSessionVideo } from '@/hooks/useSessions'
 import { analyzeLocalVideo } from '@/lib/localVideoAnalysis'
-import { BACKEND_ANALYSIS_ENABLED, queueBackendAnalysisIfEnabled } from '@/lib/analysisApi'
 import { saveVideo } from '@/hooks/useVideos'
 import { usePlayers } from '@/hooks/usePlayers'
 import { cn } from '@/lib/utils'
@@ -79,30 +78,17 @@ export function UploadPage() {
       await updateSessionStatus(session.id, 'analyzing')
       setActiveStep(2)
 
-      const localAnalysis = analyzeLocalVideo(activeFile, activeFile.name)
-        .then(({ analysis }) => {
-          console.log('Analysis complete:', analysis)
-          return updateSessionStatus(session.id, 'analyzed', undefined, analysis)
-        })
-        .catch((error) => {
-          const message = error instanceof Error ? error.message : 'Unable to analyse video in this browser.'
-          console.error('Analysis failed:', message, error)
-          setSaveError(message)
-          return updateSessionStatus(session.id, 'pending', message)
-        })
-
-      if (BACKEND_ANALYSIS_ENABLED) {
-        queueBackendAnalysisIfEnabled({
-          sessionId: session.id,
-          playerId: player.id,
-          fileName: activeFile.name,
-          blob: activeFile,
-        }).catch((error) => {
-          updateSessionStatus(session.id, 'pending', error instanceof Error ? error.message : 'Unable to queue experimental backend analysis.')
-        })
+      let analysisResult
+      try {
+        analysisResult = await analyzeLocalVideo(activeFile, activeFile.name)
+        console.log('Analysis complete:', analysisResult.analysis)
+        await updateSessionStatus(session.id, 'analyzed', undefined, analysisResult.analysis)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to analyse video in this browser.'
+        console.error('Analysis failed:', message, error)
+        setSaveError(message)
+        await updateSessionStatus(session.id, 'pending', message)
       }
-
-      await localAnalysis
       navigate(`/session/${session.id}`)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to save the video session.')
@@ -183,45 +169,52 @@ export function UploadPage() {
               ) : null}
             </div>
 
-            <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.025] p-5 sm:grid-cols-3">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-secondary">Player name</span>
-                <input
-                  key={`${selectedPlayerId ?? 'new-player'}-name`}
-                  {...form.register('name')}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
-                  data-spikeiq-field="name"
-                />
-                {form.formState.errors.name ? <p className="text-xs text-danger">{form.formState.errors.name.message}</p> : null}
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-secondary">Position</span>
-                <select
-                  key={`${selectedPlayerId ?? 'new-player'}-position`}
-                  {...form.register('position')}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
-                  data-spikeiq-field="position"
-                >
-                  <option>Outside hitter</option>
-                  <option>Opposite</option>
-                  <option>Middle blocker</option>
-                  <option>Setter</option>
-                  <option>Libero</option>
-                </select>
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-secondary">Dominant hand</span>
-                <select
-                  key={`${selectedPlayerId ?? 'new-player'}-dominant-hand`}
-                  {...form.register('dominantHand')}
-                  className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
-                  data-spikeiq-field="dominantHand"
-                >
-                  <option>Left</option>
-                  <option>Right</option>
-                </select>
-              </label>
-            </div>
+            {selectedPlayer ? (
+              <div className="rounded-2xl border border-spike/20 bg-spike/[0.06] p-4">
+                <p className="text-sm font-semibold text-primary">Active player: {selectedPlayer.name}</p>
+                <p className="mt-1 text-xs text-secondary">Video will be attached to this player profile.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.025] p-5 sm:grid-cols-3">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-secondary">Player name</span>
+                  <input
+                    key={`new-player-name`}
+                    {...form.register('name')}
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
+                    data-spikeiq-field="name"
+                  />
+                  {form.formState.errors.name ? <p className="text-xs text-danger">{form.formState.errors.name.message}</p> : null}
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-secondary">Position</span>
+                  <select
+                    key={`new-player-position`}
+                    {...form.register('position')}
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
+                    data-spikeiq-field="position"
+                  >
+                    <option>Outside hitter</option>
+                    <option>Opposite</option>
+                    <option>Middle blocker</option>
+                    <option>Setter</option>
+                    <option>Libero</option>
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-secondary">Dominant hand</span>
+                  <select
+                    key={`new-player-dominant-hand`}
+                    {...form.register('dominantHand')}
+                    className="h-12 w-full rounded-2xl border border-white/10 bg-background px-4 text-sm font-semibold text-primary outline-none transition-colors focus:border-spike"
+                    data-spikeiq-field="dominantHand"
+                  >
+                    <option>Left</option>
+                    <option>Right</option>
+                  </select>
+                </label>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
               {isSaving ? (
