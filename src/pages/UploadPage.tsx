@@ -80,9 +80,15 @@ export function UploadPage() {
       setActiveStep(2)
 
       const localAnalysis = analyzeLocalVideo(activeFile, activeFile.name)
-        .then(({ analysis }) => updateSessionStatus(session.id, 'analyzed', undefined, analysis))
+        .then(({ analysis }) => {
+          console.log('Analysis complete:', analysis)
+          return updateSessionStatus(session.id, 'analyzed', undefined, analysis)
+        })
         .catch((error) => {
-          updateSessionStatus(session.id, 'pending', error instanceof Error ? error.message : 'Unable to analyse video in this browser.')
+          const message = error instanceof Error ? error.message : 'Unable to analyse video in this browser.'
+          console.error('Analysis failed:', message, error)
+          setSaveError(message)
+          return updateSessionStatus(session.id, 'pending', message)
         })
 
       if (BACKEND_ANALYSIS_ENABLED) {

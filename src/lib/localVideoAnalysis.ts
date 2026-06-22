@@ -11,12 +11,13 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
     const video = document.createElement('video')
     video.muted = true
     video.playsInline = true
-    video.preload = 'metadata'
+    video.preload = 'auto'
     video.src = url
 
     await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve()
-      video.onerror = () => reject(new Error('The browser could not read this video file.'))
+      const timeout = setTimeout(() => reject(new Error('Video loading timed out.')), 10000)
+      video.onloadedmetadata = () => { clearTimeout(timeout); resolve() }
+      video.onerror = () => { clearTimeout(timeout); reject(new Error('The browser could not read this video file.')) }
     })
 
     const canvas = document.createElement('canvas')
@@ -34,10 +35,15 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
 
     for (let index = 0; index < frameCount; index += 1) {
       const time = frameCount <= 1 ? 0 : (index / (frameCount - 1)) * duration
-      await seekVideo(video, time)
-      context.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-      frames.push({ data: imageData.data })
+      try {
+        await seekVideo(video, time)
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+        frames.push({ data: imageData.data })
+      } catch (error) {
+        console.error('Frame capture failed at index', index, error)
+        throw error
+      }
     }
 
     if (frames.length < 2) {
@@ -54,12 +60,15 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
 }
 
 async function seekVideo(video: HTMLVideoElement, time: number) {
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Video seek timed out.')), 5000)
     const onSeeked = () => {
+      clearTimeout(timeout)
       cleanup()
       resolve()
     }
-    const onError = () => {
+    const onError = (event: Event) => {
+      clearTimeout(timeout)
       cleanup()
       reject(new Error('The browser could not seek this video for analysis.'))
     }
@@ -75,7 +84,9 @@ async function seekVideo(video: HTMLVideoElement, time: number) {
 }
 
 function analyseFrames(frames: FrameSample[]) {
-  const diffs = []
+  const diffs: { diff: number; movingRatio: number; centroidX: number; centroidY: number }[] = []
+
+  for (let index = 1; index < frames.length; index += 1) {
 
   for (let index = 1; index < frames.length; index += 1) {
     const previous = frames[index - 1].data
