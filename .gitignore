@@ -1,0 +1,19 @@
+# macOS metadata
+__MACOSX/
+._*
+.DS_Store
+
+# Large binary files
+*.MOV
+*.mp4
+*.zip
+**/uploads/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Build output
+dist/
