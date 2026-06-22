@@ -37,8 +37,8 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
       const time = (index / Math.max(frameCount - 1, 1)) * duration
       try {
         video.currentTime = time
-        // Wait a bit for the video to seek
-        await new Promise(r => setTimeout(r, 50))
+        // Wait a bit for the video to seek and draw
+        await new Promise(r => setTimeout(r, 100))
         context.drawImage(video, 0, 0, canvas.width, canvas.height)
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
         if (imageData.data.length > 0) {
@@ -63,31 +63,7 @@ export async function analyzeLocalVideo(blob: Blob, fileName: string) {
   }
 }
 
-function analyseFrames(frames: FrameSample[]) {
-  return new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Video seek timed out.')), 5000)
-    const onSeeked = () => {
-      clearTimeout(timeout)
-      cleanup()
-      resolve()
-    }
-    const onError = (event: Event) => {
-      clearTimeout(timeout)
-      cleanup()
-      reject(new Error('The browser could not seek this video for analysis.'))
-    }
-    const cleanup = () => {
-      video.removeEventListener('seeked', onSeeked)
-      video.removeEventListener('error', onError)
-    }
-
-    video.addEventListener('seeked', onSeeked, { once: true })
-    video.addEventListener('error', onError, { once: true })
-    video.currentTime = time
-  })
-}
-
-function analyseFrames(frames: FrameSample[]) {
+function analyseFrames(frames: FrameSample[]): SpikeAnalysis {
   const diffs: { diff: number; movingRatio: number; centroidX: number; centroidY: number }[] = []
 
   for (let index = 1; index < frames.length; index += 1) {
@@ -174,7 +150,7 @@ function buildSummary(metrics: Pick<SpikeAnalysis, 'spikeCount' | 'directionAccu
 }
 
 function buildTrainingFocus(metrics: Pick<SpikeAnalysis, 'directionAccuracy' | 'approachAngle' | 'contactConsistency' | 'motionScore'>) {
-  const focus = []
+  const focus: string[] = []
 
   if (metrics.directionAccuracy < 68) {
     focus.push('Target-zone swing control: hit to zones 1, 5, and deep middle from a consistent approach.')
@@ -212,7 +188,7 @@ function std(values: number[]) {
 
 function consistency(values: number[]) {
   if (values.length < 2) return 0
-  const deltas = []
+  const deltas: number[] = []
   for (let index = 1; index < values.length; index += 1) {
     deltas.push(values[index] - values[index - 1])
   }
